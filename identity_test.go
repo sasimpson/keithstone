@@ -2,12 +2,21 @@ package identity_test
 
 import (
     "os"
-    // "fmt"
+    // "errors"
     "testing"
     "net/http"
     "net/http/httptest"
     "github.com/sasimpson/identity"
 )
+
+func BuildServer(status int, response string) (server *httptest.Server){
+    server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request){
+        w.Header().Set("X-Foo", "w00t")
+        w.WriteHeader(status)
+        w.Write([]byte(response))
+    }))
+    return
+}
 
 func TestCredentialsFromEnvironment (t *testing.T) {
     os.Setenv("TEST_USER", "test_user")
@@ -43,113 +52,34 @@ func TestCredentialsFromStrings (t *testing.T) {
     }
 }
 
-/*
-const JSONAuthReply = `{
+func TestAuthenticateValid(t *testing.T) {
+    server := BuildServer(200, JSON200AuthReply)
+    defer server.Close()
+    i := identity.Identity{}
+    i.CredentialsFromStrings("test_user", "test_key", server.URL)
+    err := i.Authenticate()
+    if err != nil {
+        t.Error(err)
+        t.Fatal("error returned from Authenicate method")
+    }
+}
+
+func TestAuthenticateNotFound(t *testing.T) {
+    server := BuildServer(404, "Not Found")
+    defer server.Close()
+    i := identity.Identity{}
+    i.CredentialsFromStrings("test_user", "test_key", server.URL)
+    if err := i.Authenticate(); err == nil {
+        t.Fatal("should have received error")
+    }
+}
+
+//{"itemNotFound":{"code":404,"message":"Resource Not Found"}}
+//{"badRequest":{"code":400,"message":"JSON Parsing error"}}
+    
+const JSON200AuthReply = `{
     "access": {
         "serviceCatalog": [
-            {
-                "endpoints": [
-                   {
-                        "publicURL": "https://ord.servers.api.rackspacecloud.com/v2/12345",
-                        "region": "ORD",
-                        "tenantId": "12345",
-                        "versionId": "2",
-                        "versionInfo": "https://ord.servers.api.rackspacecloud.com/v2",
-                        "versionList": "https://ord.servers.api.rackspacecloud.com/"
-                    },
-                    {
-                        "publicURL": "https://dfw.servers.api.rackspacecloud.com/v2/12345",
-                        "region": "DFW",
-                        "tenantId": "12345",
-                        "versionId": "2",
-                        "versionInfo": "https://dfw.servers.api.rackspacecloud.com/v2",
-                        "versionList": "https://dfw.servers.api.rackspacecloud.com/"
-                    }
-                ],
-                "name": "cloudServersOpenStack",
-                "type": "compute"
-            },
-            {
-                "endpoints": [
-                    {
-                        "publicURL": "https://ord.databases.api.rackspacecloud.com/v1.0/12345",
-                        "region": "ORD",
-                        "tenantId": "12345"
-                    },
-                    {
-                        "publicURL": "https://dfw.databases.api.rackspacecloud.com/v1.0/12345",
-                        "region": "DFW",
-                        "tenantId": "12345"
-                    }
-                ],
-                "name": "cloudDatabases",
-                "type": "rax:database"
-            },
-            {
-                "endpoints": [
-                    {
-                        "publicURL": "https://ord.loadbalancers.api.rackspacecloud.com/v1.0/12345",
-                        "region": "ORD",
-                        "tenantId": "645990"
-                    },
-                    {
-                        "publicURL": "https://dfw.loadbalancers.api.rackspacecloud.com/v1.0/12345",
-                        "region": "DFW",
-                        "tenantId": "12345"
-                    }
-                ],
-                "name": "cloudLoadBalancers",
-                "type": "rax:load-balancer"
-            },
-            {
-                "endpoints": [
-                    {
-                        "publicURL": "https://cdn1.clouddrive.com/v1/MossoCloudFS_aaaa-bbbb-cccc ",
-                        "region": "DFW",
-                        "tenantId": "MossoCloudFS_aaaa-bbbb-cccc "
-                    },
-                    {
-                        "publicURL": "https://cdn2.clouddrive.com/v1/MossoCloudFS_aaaa-bbbb-cccc ",
-                        "region": "ORD",
-                        "tenantId": "MossoCloudFS_aaaa-bbbb-cccc "
-                    }
-                ],
-                "name": "cloudFilesCDN",
-                "type": "rax:object-cdn"
-            },
-            {
-                "endpoints": [
-                    {
-                        "publicURL": "https://dns.api.rackspacecloud.com/v1.0/12345",
-                        "tenantId": "12345"
-                    }
-                ],
-                "name": "cloudDNS",
-                "type": "rax:dns"
-            },
-            {
-                "endpoints": [
-                    {
-                        "publicURL": "https://servers.api.rackspacecloud.com/v1.0/12345",
-                        "tenantId": "12345",
-                        "versionId": "1.0",
-                        "versionInfo": "https://servers.api.rackspacecloud.com/v1.0",
-                        "versionList": "https://servers.api.rackspacecloud.com/"
-                    }
-                ],
-                "name": "cloudServers",
-                "type": "compute"
-            },
-            {
-                "endpoints": [
-                    {
-                        "publicURL": "https://monitoring.api.rackspacecloud.com/v1.0/12345",
-                        "tenantId": "12345"
-                    }
-                ],
-                "name": "cloudMonitoring",
-                "type": "rax:monitor"
-            },
             {
                 "endpoints": [
                     {
@@ -187,39 +117,3 @@ const JSONAuthReply = `{
         }
     }
 }`
-*/
-
-func TestAuthenticate(t *testing.T) {
-    server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request){
-        const serverStatus = 404
-        const serverResponse = "Not Found"
-        w.Header().Set("X-Foo", "w00t")
-        w.WriteHeader(serverStatus)
-        w.Write([]byte(serverResponse))
-    }))
-    defer server.Close()
-    i := identity.Identity{}
-    i.CredentialsFromStrings("test_user", "test_key", server.URL)
-    err := i.Authenticate()
-    t.Error(err)
-}
-
-/*
-func ServeAuthRequest(h http.Handler) http.Handler {
-    return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-        fmt.Println(*r.URL)
-        h.ServeHTTP(w, r)
-    })
-}
-*/
-
-/*
-func TestAuthenticate (t *testing.T) {
-    i := identity.Identity{}
-    ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { fmt.Fprintln(w, "Hello world\n") }))
-    defer ts.Close()
-    i.CredentialsFromStrings("test_user", "test_key", ts.URL)
-    err := i.Authenticate()
-    t.Error(err)
-}
-*/

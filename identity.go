@@ -87,7 +87,28 @@ func (i *Identity) Authenticate() (error) {
     resp, error := client.Do(req)
     status := resp.StatusCode
     if status/100 != 2 {
-        // fmt.Printf("status: %d\n", status)
+        /*  our identity is stupid.  it returns stupid json with the main key 
+            being dependent on the error instead of a common key like 'code' or
+            'error' to pull from.  getting the "message" will mean pulling all
+            those apart.  until that is done, this is just going to return the
+            status code from the server.
+        */
+        /*
+        body, error := ioutil.ReadAll(resp.Body)
+        var f interface{}
+        error = json.Unmarshal(body, &f)
+        // fmt.Printf("%s", body)
+        if error != nil {
+            return error
+        }
+        m := f.(map[string]interface{})
+        for k,v := range m {
+            fmt.Printf("%s=>%s\n", k,v)
+            switch k {
+            case "itemNotFound":
+                return fmt.Errorf("%d %s", m[k].code, m[k].message)
+            }
+        }*/
         return fmt.Errorf("%d", status)
     }
     defer resp.Body.Close()
