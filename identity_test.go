@@ -9,9 +9,8 @@ import (
     "github.com/sasimpson/identity"
 )
 
-func BuildServer(status int, response string) (server *httptest.Server){
+func MockServer(status int, response string) (server *httptest.Server){
     server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request){
-        w.Header().Set("X-Foo", "w00t")
         w.WriteHeader(status)
         w.Write([]byte(response))
     }))
@@ -53,7 +52,7 @@ func TestCredentialsFromStrings (t *testing.T) {
 }
 
 func TestAuthenticateValid(t *testing.T) {
-    server := BuildServer(200, JSON200AuthReply)
+    server := MockServer(200, JSON200AuthReply)
     defer server.Close()
     i := identity.Identity{}
     i.CredentialsFromStrings("test_user", "test_key", server.URL)
@@ -65,7 +64,7 @@ func TestAuthenticateValid(t *testing.T) {
 }
 
 func TestAuthenticateNotFound(t *testing.T) {
-    server := BuildServer(404, "Not Found")
+    server := MockServer(404, "Not Found")
     defer server.Close()
     i := identity.Identity{}
     i.CredentialsFromStrings("test_user", "test_key", server.URL)
