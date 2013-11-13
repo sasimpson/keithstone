@@ -1,81 +1,80 @@
 package identity_test
 
 import (
-    "os"
-    // "errors"
-    "testing"
-    "net/http"
-    "net/http/httptest"
-    "github.com/sasimpson/identity"
+	"github.com/sasimpson/identity"
+	"net/http"
+	"net/http/httptest"
+	"os"
+	"testing"
 )
 
-func MockServer(status int, response string) (server *httptest.Server){
-    server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request){
-        w.WriteHeader(status)
-        w.Write([]byte(response))
-    }))
-    return
+func MockServer(status int, response string) (server *httptest.Server) {
+	server = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(status)
+		w.Write([]byte(response))
+	}))
+	return
 }
 
-func TestCredentialsFromEnvironment (t *testing.T) {
-    os.Setenv("TEST_USER", "test_user")
-    os.Setenv("TEST_KEY", "test_key")
-    os.Setenv("TEST_URL", "test_url")
+func TestCredentialsFromEnvironment(t *testing.T) {
+	os.Setenv("TEST_USER", "test_user")
+	os.Setenv("TEST_KEY", "test_key")
+	os.Setenv("TEST_URL", "test_url")
 
-    i := identity.Identity{}
-    i.CredentialsFromEnvironment("TEST_USER", "TEST_KEY", "TEST_URL")
+	i := identity.Identity{}
+	i.CredentialsFromEnvironment("TEST_USER", "TEST_KEY", "TEST_URL")
 
-    if i.User != "test_user" {
-        t.Fatal("user env getter failed")
-    }
-    if i.Key != "test_key" {
-        t.Fatal("key env getter failed")
-    }
-    if i.AuthURL != "test_url" {
-        t.Fatal("url env getter failed")
-    }
+	if i.User != "test_user" {
+		t.Fatal("user env getter failed")
+	}
+	if i.Key != "test_key" {
+		t.Fatal("key env getter failed")
+	}
+	if i.AuthURL != "test_url" {
+		t.Fatal("url env getter failed")
+	}
 }
 
-func TestCredentialsFromStrings (t *testing.T) {
-    i := identity.Identity{}
-    i.CredentialsFromStrings("test_user", "test_key", "test_url")
+func TestCredentialsFromStrings(t *testing.T) {
+	i := identity.Identity{}
+	i.CredentialsFromStrings("test_user", "test_key", "test_url")
 
-    if i.User != "test_user" {
-        t.Fatal("user string failed")
-    }
-    if i.Key != "test_key" {
-        t.Fatal("key string failed")
-    }
-    if i.AuthURL != "test_url" {
-        t.Fatal("url string failed")
-    }
+	if i.User != "test_user" {
+		t.Fatal("user string failed")
+	}
+	if i.Key != "test_key" {
+		t.Fatal("key string failed")
+	}
+	if i.AuthURL != "test_url" {
+		t.Fatal("url string failed")
+	}
 }
 
 func TestAuthenticateValid(t *testing.T) {
-    server := MockServer(200, JSON200AuthReply)
-    defer server.Close()
-    i := identity.Identity{}
-    i.CredentialsFromStrings("test_user", "test_key", server.URL)
-    err := i.Authenticate()
-    if err != nil {
-        t.Error(err)
-        t.Fatal("error returned from Authenicate method")
-    }
+	server := MockServer(200, JSON200AuthReply)
+	defer server.Close()
+	i := identity.Identity{}
+	i.CredentialsFromStrings("test_user", "test_key", server.URL)
+	err := i.Authenticate()
+	if err != nil {
+		t.Error(err)
+		t.Fatal("error returned from Authenicate method")
+	}
 }
 
 func TestAuthenticateNotFound(t *testing.T) {
-    server := MockServer(404, "Not Found")
-    defer server.Close()
-    i := identity.Identity{}
-    i.CredentialsFromStrings("test_user", "test_key", server.URL)
-    if err := i.Authenticate(); err == nil {
-        t.Fatal("should have received error")
-    }
+	server := MockServer(404, "Not Found")
+	defer server.Close()
+	i := identity.Identity{}
+	i.CredentialsFromStrings("test_user", "test_key", server.URL)
+	if err := i.Authenticate(); err == nil {
+		t.Fatal("should have received error")
+	}
 }
 
 //{"itemNotFound":{"code":404,"message":"Resource Not Found"}}
 //{"badRequest":{"code":400,"message":"JSON Parsing error"}}
-    
+
 const JSON200AuthReply = `{
     "access": {
         "serviceCatalog": [
