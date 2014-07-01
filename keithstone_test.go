@@ -1,7 +1,7 @@
-package identity_test
+package keithstone_test
 
 import (
-	"github.com/sasimpson/identity"
+	"github.com/sasimpson/keithstone"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -21,7 +21,7 @@ func TestCredentialsFromEnvironment(t *testing.T) {
 	os.Setenv("TEST_KEY", "test_key")
 	os.Setenv("TEST_URL", "test_url")
 
-	i := identity.Identity{}
+	i := keithstone.KeithStone{}
 	i.CredentialsFromEnvironment("TEST_USER", "TEST_KEY", "TEST_URL")
 
 	if i.User != "test_user" {
@@ -36,7 +36,7 @@ func TestCredentialsFromEnvironment(t *testing.T) {
 }
 
 func TestCredentialsFromStrings(t *testing.T) {
-	i := identity.Identity{}
+	i := keithstone.KeithStone{}
 	i.CredentialsFromStrings("test_user", "test_key", "test_url")
 
 	if i.User != "test_user" {
@@ -53,7 +53,7 @@ func TestCredentialsFromStrings(t *testing.T) {
 func TestAuthenticateValid(t *testing.T) {
 	server := MockServer(200, JSON200AuthReply)
 	defer server.Close()
-	i := identity.Identity{}
+	i := keithstone.KeithStone{}
 	i.CredentialsFromStrings("test_user", "test_key", server.URL)
 	err := i.Authenticate()
 	if err != nil {
@@ -65,11 +65,25 @@ func TestAuthenticateValid(t *testing.T) {
 func TestAuthenticateNotFound(t *testing.T) {
 	server := MockServer(404, "Not Found")
 	defer server.Close()
-	i := identity.Identity{}
+	i := keithstone.KeithStone{}
 	i.CredentialsFromStrings("test_user", "test_key", server.URL)
 	if err := i.Authenticate(); err == nil {
 		t.Fatal("should have received error")
 	}
+}
+
+func TestGetService(t *testing.T) {
+    server := MockServer(200, JSON200AuthReply)
+    defer server.Close()
+    i := keithstone.KeithStone{}
+    i.CredentialsFromStrings("test_user", "test_key", server.URL)
+    i.Authenticate()
+    if endpoints := i.GetService("object-store", "DFW"); endpoints.PublicURL != "https://storage101.dfw1.clouddrive.com/v1/MossoCloudFS_aaaa-bbbb-cccc " {
+        t.Fatal("endpoints don't match for GetService DFW")
+    }
+    if endpoints := i.GetService("object-store", "ORD"); endpoints.PublicURL != "https://storage101.ord1.clouddrive.com/v1/MossoCloudFS_aaaa-bbbb-cccc " {
+        t.Fatal("endpoints don't match for GetService ORD")
+    }
 }
 
 //{"itemNotFound":{"code":404,"message":"Resource Not Found"}}
