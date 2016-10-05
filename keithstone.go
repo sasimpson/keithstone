@@ -42,25 +42,25 @@ type v2AuthResponse struct {
 	Access struct {
 		ServiceCatalog []struct {
 			Endpoints []Endpoint `json:"endpoints"`
-			Name string `json:"name"`
-			Type string `json:"type"`
-		}   `json:"serviceCatalog"`
+			Name      string     `json:"name"`
+			Type      string     `json:"type"`
+		} `json:"serviceCatalog"`
 		Token struct {
 			Expires time.Time `json:"expires"`
-			ID string `json:"id"`
-			Tenant struct {
-				ID string `json:"id"`
+			ID      string    `json:"id"`
+			Tenant  struct {
+				ID   string `json:"id"`
 				Name string `json:"name"`
 			}
-		}   `json:"token"`
+		} `json:"token"`
 		User struct {
 			DefaultRegion string `json:"RAX-AUTH:defaultRegion"`
-			ID string `json:"id"`
-			Name string `json:"name"`
-			Roles []struct {
+			ID            string `json:"id"`
+			Name          string `json:"name"`
+			Roles         []struct {
 				Description string `json:"description"`
-				ID string `json:"id"`
-				Name string `json:"name"`
+				ID          string `json:"id"`
+				Name        string `json:"name"`
 			} `json:"roles"`
 		} `json:"user"`
 	} `json:"access"`
@@ -97,27 +97,27 @@ func (ks *KeithStone) Authenticate() error {
 	status := resp.StatusCode
 	if status/100 != 2 {
 		/*  our identity is stupid.  it returns stupid json with the main key
-			being dependent on the error instead of a common key like 'code' or
-			'error' to pull from.  getting the "message" will mean pulling all
-			those apart.  until that is done, this is just going to return the
-			status code from the server.
+		being dependent on the error instead of a common key like 'code' or
+		'error' to pull from.  getting the "message" will mean pulling all
+		those apart.  until that is done, this is just going to return the
+		status code from the server.
 		*/
 		/*
-		   body, error := ioutil.ReadAll(resp.Body)
-		   var f interface{}
-		   error = json.Unmarshal(body, &f)
-		   // fmt.Printf("%s", body)
-		   if error != nil {
-			   return error
-		   }
-		   m := f.(map[string]interface{})
-		   for k,v := range m {
-			   fmt.Printf("%s=>%s\n", k,v)
-			   switch k {
-			   case "itemNotFound":
-				   return fmt.Errorf("%d %s", m[k].code, m[k].message)
+			   body, error := ioutil.ReadAll(resp.Body)
+			   var f interface{}
+			   error = json.Unmarshal(body, &f)
+			   // fmt.Printf("%s", body)
+			   if error != nil {
+				   return error
 			   }
-		   }*/
+			   m := f.(map[string]interface{})
+			   for k,v := range m {
+				   fmt.Printf("%s=>%s\n", k,v)
+				   switch k {
+				   case "itemNotFound":
+					   return fmt.Errorf("%d %s", m[k].code, m[k].message)
+				   }
+			   }*/
 		// body, _ := ioutil.ReadAll(resp.Body)
 		// fmt.Println("Auth Body: ", body)
 		return fmt.Errorf("%d", status)
