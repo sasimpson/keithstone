@@ -53,3 +53,25 @@ func TestNewToken(t *testing.T) {
 	token := dbi.newToken(1)
 	assert.Equal(Token{}.ID, token.ID)
 }
+
+func TestGetUserToken(t *testing.T) {
+	dba, mock, err := sqlmock.New()
+	assert := assert.New(t)
+	dbi.database = dba
+	if err != nil {
+		t.Fatalf("an error '%s' was not expected when opening a stub database connection", err)
+	}
+	defer dbi.close()
+	testTime := time.Date(2016, time.January, 1, 0, 0, 0, 0, time.UTC)
+	mock.ExpectQuery("select token_id, expiration, created_at from tokens").
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{"token_id", "expiration", "created_at"}).AddRow("1", testTime, testTime.AddDate(0, 0, 1)))
+	token, err := dbi.getUserToken(1)
+	assert.Equal("1", token.ID)
+
+	mock.ExpectQuery("select token_id, expiration, created_at from tokens").
+		WithArgs(1).
+		WillReturnRows(sqlmock.NewRows([]string{}).AddRow())
+	token, err = dbi.getUserToken(1)
+	assert.Equal(Token{}, token)
+}
