@@ -16,12 +16,7 @@ import (
 var dbi db
 
 type db struct {
-	database interface {
-		QueryRow(query string, args ...interface{}) *sql.Row
-		Prepare(query string) (*sql.Stmt, error)
-		Exec(query string, args ...interface{}) (sql.Result, error)
-		Close() error
-	}
+	database *sql.DB
 }
 
 //Token - the structure of a token response
@@ -182,8 +177,6 @@ func (db *db) validateLogin(ar AuthRequest) (User, error) {
 	log.Println("validateLogin")
 	username := ar.Auth.PasswordCredentials.Username
 	password := ar.Auth.PasswordCredentials.Password
-	log.Printf("validateLogin username: %s\n", username)
-	log.Printf("validateLogin password: %s\n", password)
 	var user User
 	err := db.database.QueryRow("select id, name from users where name = ? and password = ?", username, password).Scan(&user.ID, &user.Name)
 	if err != nil {
@@ -229,9 +222,10 @@ func (db *db) newToken(userID int) Token {
 		ID:       uuid.NewV4().String(),
 		IssuedAt: time.Now(),
 		Expires:  time.Now().AddDate(0, 0, 1)}
-	res, _ := stmt.Exec(token.ID, userID, token.IssuedAt, token.Expires)
-	rowsAff, _ := res.RowsAffected()
-	log.Printf("newToken rows affected: %d", rowsAff)
+	_, err := stmt.Exec(token.ID, userID, token.IssuedAt, token.Expires)
+	if err != nil {
+		return Token{}
+	}
 	return token
 }
 
