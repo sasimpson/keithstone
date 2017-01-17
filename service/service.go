@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gorilla/mux"
@@ -13,10 +14,17 @@ import (
 	"github.com/satori/go.uuid"
 )
 
-var dbi db
+var (
+	dbi       db
+	appConfig config
+)
 
 type db struct {
 	database *sql.DB
+}
+
+type config struct {
+	LazyAuth bool
 }
 
 //Token - the structure of a token response
@@ -66,10 +74,10 @@ type AuthRequest struct {
 			Username string `json:"username"`
 			Password string `json:"password"`
 		} `json:"passwordCredentials"`
-		TenantName string `json:"tenantName,omitempty"`
-		Token      struct {
-			ID string `json:"id,omitempty"`
-		} `json:"token,omitempty"`
+		// TenantName string `json:"tenantName,omitempty"`
+		// Token      struct {
+		// 	ID string `json:"id,omitempty"`
+		// } `json:"token,omitempty"`
 	} `json:"auth"`
 }
 
@@ -95,13 +103,16 @@ type AuthResponse struct {
 func init() {
 	r := mux.NewRouter()
 	r.HandleFunc("/", homeHandler)
-	r.HandleFunc("/token", getTokenHandler)
-	r.HandleFunc("/token/{tokenID}", validateTokenHandler)
+
+	s := r.PathPrefix("/v2").Subrouter()
+	s.HandleFunc("/token", getTokenHandler).Methods("POST")
+	s.HandleFunc("/token/{tokenID}", validateTokenHandler).Methods("POST")
 	http.Handle("/", r)
 }
 
 //Serve - run service
 func Serve() {
+	appConfig.LazyAuth = true
 	http.ListenAndServe(":8080", nil)
 }
 
@@ -115,6 +126,7 @@ func getTokenHandler(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	var authRequest AuthRequest
 	err := decoder.Decode(&authRequest)
+	log.Printf("getTokenHandler authRequest: %v", authRequest)
 	if err != nil {
 		http.Error(w, "json decode failure", http.StatusBadRequest)
 		return
@@ -125,6 +137,7 @@ func getTokenHandler(w http.ResponseWriter, r *http.Request) {
 	user, err := dbi.validateLogin(authRequest)
 	if err != nil {
 		http.Error(w, "invalid login", http.StatusUnauthorized)
+		return
 	}
 	//get the users token
 	token, err := dbi.getUserToken(user)
@@ -141,21 +154,38 @@ func getTokenHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func validateTokenHandler(w http.ResponseWriter, r *http.Request) {
-	// vars := mux.Vars(r)
-	// tokenID := vars["tokenID"]
+	userTokenID := r.Header.Get("X-Auth-Token")
+	if validateToken(userTokenID) {
+		var validateResponse AuthResponse
+		validateResponse.Access.User = User{Name: "userA", ID: 100}
+		validateResponse.Access.Token = Token{
+			IssuedAt: time.Now(),
+			Expires:  time.Now().AddDate(0, 0, 1),
+			ID:       "123456abcxzy"}
+		validateResponse.Access.Token.Tenant.ID = "tenantA1"
+		validateResponse.Access.Token.Tenant.Name = "tenantA1"
+		validateResponse.Access.User.Roles = []Role{}
+		js, _ := json.Marshal(validateResponse)
+		w.Write([]byte(js))
+		return
+	}
+	http.Error(w, "invalid login", http.StatusForbidden)
+	return
+}
 
-	var validateResponse AuthResponse
-	validateResponse.Access.User = User{Name: "userA", ID: 100}
-	validateResponse.Access.Token = Token{
-		IssuedAt: time.Now(),
-		Expires:  time.Now().AddDate(0, 0, 1),
-		ID:       "123456abcxzy"}
-	validateResponse.Access.Token.Tenant.ID = "tenantA1"
-	validateResponse.Access.Token.Tenant.Name = "tenantA1"
-	validateResponse.Access.User.Roles = []Role{}
+func validateToken(token string) bool {
+	if appConfig.LazyAuth == true && checkLazyAuth(token) {
+		return true
+	}
+	//TODO add in token validation stack
+	return false
+}
 
-	js, _ := json.Marshal(validateResponse)
-	w.Write([]byte(js))
+func checkLazyAuth(token string) bool {
+	if strings.HasSuffix(token, "a0") || strings.HasSuffix(token, "sm00th") {
+		return true
+	}
+	return false
 }
 
 //db interface methods
@@ -172,6 +202,9 @@ func (db *db) close() {
 func (db *db) validateLogin(ar AuthRequest) (User, error) {
 	username := ar.Auth.PasswordCredentials.Username
 	password := ar.Auth.PasswordCredentials.Password
+	log.Printf("validateLogin username: %v", username)
+	log.Printf("validateLogin password: %v", password)
+
 	var userID int
 	err := db.database.QueryRow("select id from users where name = ? and password = ?", username, password).Scan(&userID)
 	log.Printf("validateLogin userID: %v", userID)
@@ -267,6 +300,20 @@ func (db *db) SetToken(token Token, user User) error {
 	_, err = stmt.Exec(token.ID, user.ID, token.IssuedAt, token.Expires)
 	stmt.Close()
 	return err
+}
+
+func (db *db) UserForToken(token string) (User, error) {
+	var userID int
+	err := db.database.QueryRow("select user_id from tokens where token_id = ?", token).Scan(&userID)
+	if err != nil {
+		return User{}, err
+	}
+	user, err := db.User(userID)
+	if err != nil {
+		return User{}, err
+	}
+	log.Printf("db.UserForToken: %v", user.ID)
+	return user, nil
 }
 
 func (db *db) User(id int) (User, error) {
