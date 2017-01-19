@@ -20,7 +20,7 @@ the *abcdefgh* part is the project id you wish to have passed back and the same 
 the config bitmask is like so:
 
 | config bitmask | configuration |
-| -- | -- |
+| --- | --- |
 |0000|invalid token|
 |0001| valid token, not as admin|
 |0002| invalid token, as admin |
